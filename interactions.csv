@@ -1,1 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drug Interaction Checker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+            background-color: #f4f7f6;
+        }
+        h1 { color: #2c3e50; text-align: center; }
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #status {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+        .result-card {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid #e74c3c;
+        }
+        .result-card h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .result-card p {
+            margin: 0;
+            color: #555;
+            line-height: 1.5;
+        }
+        .highlight { background-color: #f1c40f; padding: 2px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
 
+    <h1>💊 Drug Interaction Checker</h1>
+    <div id="status">Loading dataset (191k+ interactions)... Please wait.</div>
+
+    <div class="search-container">
+        <input type="text" id="search-input" placeholder="Type a drug name (e.g., Verteporfin, Ulipristal)..." disabled>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        let drugData = [];
+
+        // 1. Load and Parse the CSV file automatically on page load
+        Papa.parse("interactions.csv", {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                drugData = results.data;
+                document.getElementById('status').innerText = `Dataset loaded successfully! Total interactions: ${drugData.length.toLocaleString()}`;
+                const searchInput = document.getElementById('search-input');
+                searchInput.disabled = false;
+                searchInput.focus();
+            },
+            error: function(err) {
+                document.getElementById('status').innerText = "Error loading the dataset. Make sure interactions.csv is uploaded.";
+                console.error(err);
+            }
+        });
+
+        // 2. Add Event Listener to Search Input
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = ""; // Clear old results
+
+            if (searchTerm.length < 3) {
+                if (searchTerm.length > 0) {
+                    resultsDiv.innerHTML = "<p style='text-align:center; color:#7f8c8d;'>Please type at least 3 characters to search...</p>";
+                }
+                return;
+            }
+
+            // Filter data matching either Drug 1 or Drug 2
+            let matches = [];
+            for (let i = 0; i < drugData.length; i++) {
+                const row = drugData[i];
+                const d1 = row["Drug 1"] ? row["Drug 1"].toLowerCase() : "";
+                const d2 = row["Drug 2"] ? row["Drug 2"].toLowerCase() : "";
+
+                if (d1.includes(searchTerm) || d2.includes(searchTerm)) {
+                    matches.push(row);
+                }
+
+                // Stop searching once we hit 100 matches to keep the UI fast
+                if (matches.length >= 100) break;
+            }
+
+            // 3. Render Results to HTML
+            if (matches.length === 0) {
+                resultsDiv.innerHTML = "<p style='text-align:center; color:#e74c3c;'>No interactions found for this drug.</p>";
+            } else {
+                matches.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    card.innerHTML = `
+                        <h3>${item["Drug 1"]} ↔️ ${item["Drug 2"]}</h3>
+                        <p>${item["Interaction Description"]}</p>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+                
+                if (matches.length >= 100) {
+                    const notice = document.createElement('p');
+                    notice.style.textAlign = 'center';
+                    notice.style.color = '#7f8c8d';
+                    notice.innerText = "Showing top 100 results. Refine your search for more specific interactions.";
+                    resultsDiv.appendChild(notice);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
